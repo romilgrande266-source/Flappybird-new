@@ -22,11 +22,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Read version from config.yml
-        id: cfg
+      - name: Check project files
         run: |
-          VERSION=$(awk '/^game:/{f=1;next} /^[^ #]/{f=0} f && $1=="version:"{gsub(/"/,"",$2); print $2}' config.yml)
-          echo "version=${VERSION:-1.0.0}" >> "$GITHUB_OUTPUT"
+          for f in project.godot export_presets.cfg tools/ci_setup.sh tools/build_apks.sh; do
+            [ -f "$f" ] || { echo "MISSING FILE: $f - upload the full project to the repo root"; exit 1; }
+          done
 
       - name: Prepare Godot + Android SDK
         run: bash tools/ci_setup.sh
