@@ -37,19 +37,30 @@ jobs:
             cp -a "$SRC"/. .
           fi
 
-      - name: Check project files
-        run: |
-          for f in project.godot export_presets.cfg tools/ci_setup.sh tools/build_apks.sh; do
-            [ -f "$f" ] || { echo "MISSING FILE: $f"; exit 1; }
-          done
-
       - name: Prepare Godot + Android SDK
         run: bash tools/ci_setup.sh
 
       - name: Build APKs
-        env:
-          EXPORT_MODE: debug
-        run: bash tools/build_apks.sh
+        run: |
+          mkdir -p exports
+          export GODOT_ANDROID_KEYSTORE_DEBUG_PATH="$HOME/.android/debug.keystore"
+          export GODOT_ANDROID_KEYSTORE_DEBUG_USER="androiddebugkey"
+          export GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD="android"
+          godot --headless --path . --import || true
+          godot --headless --path . --import || true
+          godot --headless --path . --export-debug "Android arm64" exports/FlappyBirdUltimate-arm64.apk
+          godot --headless --path . --export-debug "Android arm32" exports/FlappyBirdUltimate-arm32.apk
+          ls -la exports
+
+      - name: Verify ABIs
+        run: |
+          L64=$(unzip -l exports/FlappyBirdUltimate-arm64.apk)
+          L32=$(unzip -l exports/FlappyBirdUltimate-arm32.apk)
+          echo "--- arm64 native libs ---"; grep "lib/" <<< "$L64" || true
+          echo "--- arm32 native libs ---"; grep "lib/" <<< "$L32" || true
+          grep -q "lib/arm64-v8a/" <<< "$L64" || { echo "arm64 APK is missing arm64-v8a libs"; exit 1; }
+          grep -q "lib/armeabi-v7a/" <<< "$L32" || { echo "arm32 APK is missing armeabi-v7a libs"; exit 1; }
+          echo "ABI check OK"
 
       - uses: actions/upload-artifact@v4
         with:
